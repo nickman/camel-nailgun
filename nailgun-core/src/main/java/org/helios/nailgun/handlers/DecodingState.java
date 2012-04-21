@@ -50,7 +50,8 @@ public enum DecodingState {
     STDOUT(NailgunConstants.CHUNKTYPE_STDOUT),
     STDERR(NailgunConstants.CHUNKTYPE_STDERR),
     EXIT(NailgunConstants.CHUNKTYPE_EXIT),
-    INPUT(NailgunConstants.CHUNKTYPE_STARTINPUT);
+    STARTINPUT(NailgunConstants.CHUNKTYPE_STARTINPUT),
+    DEBUG((byte)Byte.MAX_VALUE);
     
 	/**
 	 * Returns the DecodingState for the passed chunkType
@@ -81,8 +82,8 @@ public enum DecodingState {
 		}
 	}
 	
-	public boolean isService() {
-		return service;
-	}
+//	public boolean isService() {
+//		return service;
+//	}
 	
 }
