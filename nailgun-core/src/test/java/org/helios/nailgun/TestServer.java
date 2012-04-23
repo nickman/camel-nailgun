@@ -32,6 +32,7 @@ import java.util.logging.Logger;
 import org.helios.nailgun.codecs.NailgunRequestDecoder;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
+import org.junit.Ignore;
 /**
  * <p>Title: TestServer</p>
  * <p>Description: A quickie nailgun test server</p> 
@@ -39,7 +40,7 @@ import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
  * <p><code>org.helios.nailgun.TestServer</code></p>
  */
-
+@Ignore
 public class TestServer {
 
 	/**
