@@ -9,6 +9,7 @@
   <url>http://www.heliosdev.org/projects/opentrace</url>
   <modules>
     <module>nailgun-core</module>
+    <module>nailgun-orig</module>
   </modules>
   <properties>
     <junit.version>4.8.2</junit.version>

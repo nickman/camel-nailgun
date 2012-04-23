@@ -22,20 +22,21 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org. 
  *
  */
-package org.helios.nailgun.handlers;
+package org.helios.nailgun.codecs;
 
 import org.helios.nailgun.DefaultNailgunRequestImpl;
+import org.jboss.netty.buffer.ChannelBuffer;
 
 /**
- * <p>Title: NailGunContextState</p>
+ * <p>Title: NailgunContextState</p>
  * <p>Description: A class whose instances retain the stateful context of a Nailgun request that is in flight.
  * These instances are attached to the ChannelHandlerContext for the duration of the conversation.</p> 
  * <p>Company: Helios Development Group LLC</p>
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
- * <p><code>org.helios.nailgun.handlers.NailGunContextState</code></p>
+ * <p><code>org.helios.nailgun.codecs.NailgunContextState</code></p>
  */
 
-public class NailGunContextState {
+public class NailgunContextState {
 	/** The request created */
 	private DefaultNailgunRequestImpl message;
 	/** byte array buffer */
@@ -47,9 +48,23 @@ public class NailGunContextState {
 	/** The number of bytes to read in the next event */
 	private int bytesToRead;
 	
-	NailGunContextState() {
-		
+	/**
+	 * Creates a new NailgunContextState
+	 */
+	NailgunContextState() {
+		cleanup();
 	}
+	
+	 /**
+	 * Cleans up any remaining state
+	 */
+	protected void cleanup() {
+		bytes = null;
+		state = null;
+		chunkType = -10;
+		bytesToRead = -1;
+		message = new DefaultNailgunRequestImpl();
+	}	
 
 	/**
 	 * Returns 
@@ -96,6 +111,7 @@ public class NailGunContextState {
 	 * @param state the state to set
 	 */
 	void setState(DecodingState state) {
+		//if(state==null) throw new IllegalArgumentException("The passed DecodingState was null", new Throwable());
 		this.state = state;
 	}
 
@@ -108,11 +124,27 @@ public class NailGunContextState {
 	}
 
 	/**
-	 * Sets 
+	 * Sets the chunk type. If the chunk type is validated, the corresponding DecodingState is set as well.
+	 * If the chunk type is not validated, an IllegalStateException is thrown.
 	 * @param chunkType the chunkType to set
 	 */
 	void setChunkType(byte chunkType) {
+		DecodingState ds = DecodingState.getState(chunkType);
+		if(ds==null) {
+			throw new IllegalStateException("Invalid ChunkType [" + (char)chunkType + "]", new Throwable());
+		}
 		this.chunkType = chunkType;
+		this.state = ds;
+	}
+	
+	/**
+	 * Creates a new byte array sized by the current value of <code>bytesToRead</code>
+	 * and fills the array from the passed buffer
+	 * @param buffer The channel buffer to read from
+	 */
+	void readBytes(ChannelBuffer buffer) {
+		bytes = new byte[bytesToRead];
+		buffer.readBytes(bytes);
 	}
 
 	/**
@@ -140,7 +172,7 @@ public class NailGunContextState {
 	 */
 	public String toString() {
 	    final String TAB = "\n\t";
-	    StringBuilder retValue = new StringBuilder("NailGunContextState [")
+	    StringBuilder retValue = new StringBuilder("NailgunContextState [")
 	        .append(TAB).append("message:").append(this.message)
 	        .append(TAB).append("bytes:").append(this.bytes)
 	        .append(TAB).append("state:").append(this.state)

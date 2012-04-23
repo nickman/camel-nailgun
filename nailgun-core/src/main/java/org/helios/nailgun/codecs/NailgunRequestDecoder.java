@@ -22,11 +22,10 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org. 
  *
  */
-package org.helios.nailgun.handlers;
+package org.helios.nailgun.codecs;
 
 import java.net.InetSocketAddress;
 
-import org.helios.nailgun.DefaultNailgunRequestImpl;
 import org.helios.nailgun.NailgunConstants;
 import org.helios.nailgun.NailgunRequest;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -40,7 +39,7 @@ import org.jboss.netty.logging.InternalLogger;
 import org.jboss.netty.logging.InternalLoggerFactory;
 
 /**
- * <p>Title: NailgunStreamHandler</p>
+ * <p>Title: NailgunRequestDecoder</p>
  * <p>Description: The Netty channel handler that decodes a nailgun request</p> 
  * <p>Based in great part on:<ol>
  * 	<li><b><code>com.martiansoftware.nailgun.NGSession</code></b> by <a href="http://www.martiansoftware.com/contact.html">Marty Lamb</a></li>
@@ -54,27 +53,19 @@ import org.jboss.netty.logging.InternalLoggerFactory;
  *  </ol></p>
  * <p>Company: Helios Development Group LLC</p>
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
- * <p><code>org.helios.nailgun.handlers.NailgunStreamHandler</code></p>
+ * <p><code>org.helios.nailgun.codecs.NailgunRequestDecoder</code></p>
  */
 
-public class NailgunStreamHandler extends ReplayingDecoder<DecodingState>  {
+public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 	/** The internal logger */
 	protected final InternalLogger log = InternalLoggerFactory.getInstance(getClass());
-	/** The request created */
-	private DefaultNailgunRequestImpl message;
-	/** byte array buffer */
-	private byte[] bytes = null;
-	/** The type decoding state */
-	private DecodingState state = null;	
-	/** The current chunk type */
-	private byte chunkType;
-	/** The number of bytes to read in the next event */
-	private int bytesToRead;
-	
-	
+	/** The request context */
+	//protected NailgunContextState ngcontext = new NailgunContextState();
 	
 	/** The signal to send the client when we're ready to handle the stream input */
 	private static final ChannelBuffer STREAM_IN_READY = ChannelBuffers.buffer(5);
+	/** The signal to send the client when the stream input procesing is complete */
+	private static final ChannelBuffer STREAM_IN_DONE = ChannelBuffers.buffer(5);
 
 	
 	
@@ -83,35 +74,58 @@ public class NailgunStreamHandler extends ReplayingDecoder<DecodingState>  {
 		// Prep the stream in readiness buffer
 		STREAM_IN_READY.writeInt(0);
 		STREAM_IN_READY.writeByte(NailgunConstants.CHUNKTYPE_STARTINPUT);
+		// Prep the stream in complete buffer
+		STREAM_IN_DONE.writeInt(0);
+		STREAM_IN_DONE.writeByte(NailgunConstants.CHUNKTYPE_EXIT);
 	}
 	
 	/**
-	 * Creates a new NailgunStreamHandler
+	 * Returns the current NailgunContextState
+	 * @param ctx The channel handler context which might have a current context as an attachment
+	 * @return the current NailgunContextState
 	 */
-	public NailgunStreamHandler() {
-		if(log.isDebugEnabled()) log.debug("Created NailgunStreamHandler Instance");
-		//System.out.println("Created NailgunStreamHandler Instance");
-		reset();
+	protected NailgunContextState getContext(ChannelHandlerContext ctx) {
+		NailgunContextState ncs = (NailgunContextState) ctx.getAttachment();
+		if(ncs==null) {
+			ncs = new NailgunContextState();
+			ctx.setAttachment(ncs);
+		}
+		return ncs;
+	}
+	
+	/**
+	 * Creates a new NailgunRequestDecoder
+	 */
+	public NailgunRequestDecoder() {
+		if(log.isDebugEnabled()) log.debug("Created NailgunRequestDecoder Instance");
+		checkpoint(DecodingState.BYTES);
+		//System.out.println("Created NailgunRequestDecoder Instance");
+		//reset();
 	}
 
 	/**
 	 * Resets the decoder
+	 * @param ctx The channel handler context 
 	 */
-	private void reset() {
-		if(log.isDebugEnabled()) log.debug("NailgunStreamHandler Reset");
-		cleanup();
-        checkpoint(DecodingState.BYTES);
-        this.message = new DefaultNailgunRequestImpl();
+	private void reset(ChannelHandlerContext ctx) {
+		if(log.isDebugEnabled()) log.debug("NailgunRequestDecoder Reset");
+		getContext(ctx).cleanup();
+        checkpoint(DecodingState.BYTES);        
     }
 
 	/**
-	 * {@inheritDoc}
-	 * @see org.jboss.netty.handler.codec.replay.ReplayingDecoder#checkpoint(java.lang.Enum)
+	 * Copies the decoding state into the current context and delegates the checkpoint to the super.
+	 * @param ctx The channel handler context 
+	 * @param state The current decoding state
 	 */
-	protected void checkpoint(DecodingState state) {
-		this.state = state;
-		super.checkpoint(state);
+	protected void checkpoint(ChannelHandlerContext ctx, DecodingState state) {
+		getContext(ctx).setState(state);
+		checkpoint(state);
 		if(log.isDebugEnabled()) log.debug("checkpoint:" + state);
+	}
+	
+	protected void checkpoint(DecodingState state) {
+		super.checkpoint(state);
 	}
 	
 	/**
@@ -120,70 +134,73 @@ public class NailgunStreamHandler extends ReplayingDecoder<DecodingState>  {
 	 */
 	@Override
 	protected NailgunRequest decode(final ChannelHandlerContext ctx, final Channel channel, ChannelBuffer buffer, DecodingState decodeState) throws Exception {
-		state = decodeState;
-		if(message.getRemoteAddress()==null) {
+		if(decodeState==null) return null;
+		NailgunContextState context = getContext(ctx);
+		context.setState(decodeState);
+		if(context.getMessage().getRemoteAddress()==null) {
 			InetSocketAddress remote = (InetSocketAddress)channel.getRemoteAddress();
-			message.setRemoteAddress(remote.getAddress());
-			message.setRemotePort(remote.getPort());
+			context.getMessage().setRemoteAddress(remote.getAddress());
+			context.getMessage().setRemotePort(remote.getPort());
 		}
 		while(true) {
-			switch(state) {
+			switch(context.getState()) {
 				case BYTES:
-					bytesToRead = buffer.readInt();
-					checkpoint(DecodingState.TYPE);	
-					if(log.isDebugEnabled()) log.debug("NG Chunk [BYTES]:" + bytesToRead);
+					context.setBytesToRead(buffer.readInt());
+					checkpoint(ctx, DecodingState.TYPE);	
+					if(log.isDebugEnabled()) log.debug("NG Chunk [BYTES]:" + context.getBytesToRead());
 					break;
 				case TYPE:
-					chunkType = buffer.readByte();
-					state = DecodingState.getState(chunkType);
-					if(state==null) {
-						throw new Exception("Invalid chunk type [" + chunkType + "]", new Throwable());
-					}
-					checkpoint(state);
-					if(log.isDebugEnabled()) log.debug("NG Chunk [TYPE]:" + state);
-					//log.info("NG Chunk [TYPE]:" + state);
+					context.setChunkType(buffer.readByte());
+					checkpoint(ctx, context.getState());
+					if(log.isDebugEnabled()) log.debug("NG Chunk [TYPE]:" + context.getState());					
 					break;
 				case WORKING_DIR:
-					bytes = new byte[bytesToRead];
-					buffer.readBytes(bytes);
-					message.setWorkingDirectory(new String(bytes));
-					checkpoint(DecodingState.BYTES);
-					if(log.isDebugEnabled()) log.debug("NG Chunk [WORKING_DIR]:" + message.getWorkingDirectory());
+					context.readBytes(buffer);
+					context.getMessage().setWorkingDirectory(new String(context.getBytes()));
+					checkpoint(ctx, DecodingState.BYTES);
+					if(log.isDebugEnabled()) log.debug("NG Chunk [WORKING_DIR]:" + context.getMessage().getWorkingDirectory());
 					break;
 				case ENVIRONMENT:
-					bytes = new byte[bytesToRead];
-					buffer.readBytes(bytes);
-					message.addToEnvironment(new String(bytes));
-					checkpoint(DecodingState.BYTES);
+					context.readBytes(buffer);
+					context.getMessage().addToEnvironment(new String(context.getBytes()));
+					checkpoint(ctx, DecodingState.BYTES);
 					//if(log.isDebugEnabled()) log.debug("NG Chunk [ENVIRONMENT]:" + new String(bytes));
 					break;
 				case ARGUMENTS:
-					bytes = new byte[bytesToRead];
-					buffer.readBytes(bytes);
-					message.addArgument(new String(bytes));
-					checkpoint(DecodingState.BYTES);
-					if(log.isDebugEnabled()) log.debug("NG Chunk [ARGUMENTS]:" + new String(bytes));
-					break;
-				case STDIN:
-					bytes = new byte[bytesToRead];
-					buffer.readBytes(bytes);
-					System.out.println("INSTREAM:" + new String(bytes));
-					checkpoint(DecodingState.STDIN_EOF);
-					System.out.println("ENV:\n" + message.printEnvironment());
+					context.readBytes(buffer);
+					context.getMessage().addArgument(new String(context.getBytes()));
+					checkpoint(ctx, DecodingState.BYTES);
+					if(log.isDebugEnabled()) log.debug("NG Chunk [ARGUMENTS]:" + new String(context.getBytes()));
+					break;			
 				case COMMAND:
-					bytes = new byte[bytesToRead];
-					buffer.readBytes(bytes);
-					message.setCommand(new String(bytes));					
-					if(log.isDebugEnabled()) log.debug("NG Chunk [COMMAND]:" + message.getCommand());
-					checkpoint(DecodingState.BYTES);
-					sendStartStdInSignal(ctx, channel);
+					context.readBytes(buffer);
+					context.getMessage().setCommand(new String(context.getBytes()));					
+					if(log.isDebugEnabled()) log.debug("NG Chunk [COMMAND]:" + context.getMessage().getCommand());
+					
+					
 					// at this point, we can complete the Nailgun request
 					// and send it for dispatch.
-					if(log.isDebugEnabled()) log.debug("Nailgun Client Complete:\n" + message);
+					if(log.isDebugEnabled()) log.debug("Nailgun Client Complete:\n" + context.getMessage());
+					checkpoint(ctx, DecodingState.BYTES);
+					sendStartStdInSignal(ctx, channel);
+					try {
+						Thread.sleep(500);
+						log.info("Readable Bytes:" + buffer.readableBytes());
+					} catch (Exception e) {
+						log.error("Failed to pause and wait for STDIN", e);
+					}
 					break;
+				case STDIN:
+					context.readBytes(buffer);					
+					System.out.println("INSTREAM:" + new String(context.getBytes()));
+					checkpoint(ctx, DecodingState.BYTES);							
 				case STDIN_EOF:
 					// this means that the std in has completed
-					if(log.isDebugEnabled()) log.debug("NG Chunk [" + state + "]");
+					System.out.println("INSTREAM  COMPLETE");
+					if(log.isDebugEnabled()) log.debug("NG Chunk [" + context.getState() + "]");
+					reset(ctx);
+					sendCompletedStdInSignal(ctx, channel);
+					return null;
 //				case STARTINPUT:
 //					channel.write(NailgunConstants.CHUNKTYPE_STARTINPUT).awaitUninterruptibly();
 //					checkpoint(DecodingState.DEBUG);
@@ -235,14 +252,17 @@ public class NailgunStreamHandler extends ReplayingDecoder<DecodingState>  {
 		ctx.sendDownstream(dme);
 	}
 	
-	 /**
-	 * Cleans up any remaining state
+	/**
+	 * Sends a signal back to the nailgun client indicating that we've completed reading the input stream
+	 * @param ctx The ChannelHandlerContext
+	 * @param channel The channel
 	 */
-	protected void cleanup() {
-		bytes = null;
-		state = null;
-		chunkType = -10;
-		bytesToRead = -1;
-	}
+	protected void sendCompletedStdInSignal(ChannelHandlerContext ctx, Channel channel) {
+		DownstreamMessageEvent dme = new DownstreamMessageEvent(channel, Channels.future(channel), STREAM_IN_DONE, channel.getRemoteAddress());
+		ctx.sendDownstream(dme);
+		channel.close();
+	}	
+	
+
 
 }

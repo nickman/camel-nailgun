@@ -24,37 +24,55 @@
  */
 package org.helios.nailgun;
 
-import static org.jboss.netty.channel.Channels.pipeline;
+import static org.junit.Assert.*;
 
-import org.helios.nailgun.codecs.NailgunRequestDecoder;
-import org.jboss.netty.channel.ChannelPipeline;
-import org.jboss.netty.channel.ChannelPipelineFactory;
-import org.jboss.netty.handler.logging.LoggingHandler;
-import org.jboss.netty.logging.InternalLogLevel;
+import org.junit.After;
+import org.junit.AfterClass;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 
 /**
- * <p>Title: NailgunServerPipelineFactory</p>
- * <p>Description: A server pipeline factory for the nailgun server</p> 
+ * <p>Title: NailGunTestCase</p>
+ * <p>Description: </p> 
  * <p>Company: Helios Development Group LLC</p>
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
- * <p><code>org.helios.nailgun.NailgunServerPipelineFactory</code></p>
+ * <p><code>org.helios.nailgun.NailGunTestCase</code></p>
  */
 
-public class NailgunServerPipelineFactory implements ChannelPipelineFactory {
+public class NailGunTestCase {
 
 	/**
-	 * {@inheritDoc}
-	 * @see org.jboss.netty.channel.ChannelPipelineFactory#getPipeline()
+	 * @throws java.lang.Exception
 	 */
-	@Override
-	public ChannelPipeline getPipeline() throws Exception {
-		ChannelPipeline pipeline = pipeline();
-		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, true));
-		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
-		pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
-		pipeline.addLast("nailgun-decoder", new NailgunRequestDecoder());
-		
-		return pipeline;
+	@BeforeClass
+	public static void setUpBeforeClass() throws Exception {
+	}
+
+	/**
+	 * @throws java.lang.Exception
+	 */
+	@AfterClass
+	public static void tearDownAfterClass() throws Exception {
+	}
+
+	/**
+	 * @throws java.lang.Exception
+	 */
+	@Before
+	public void setUp() throws Exception {
+	}
+
+	/**
+	 * @throws java.lang.Exception
+	 */
+	@After
+	public void tearDown() throws Exception {
+	}
+
+	@Test
+	public void test() {
+		fail("Not yet implemented");
 	}
 
 }

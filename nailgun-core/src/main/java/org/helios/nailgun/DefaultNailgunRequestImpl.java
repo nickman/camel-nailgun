@@ -33,11 +33,11 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
 
-import org.helios.nailgun.handlers.NailgunStreamHandler;
+import org.helios.nailgun.codecs.NailgunRequestDecoder;
 
 /**
  * <p>Title: DefaultNailgunRequestImpl</p>
- * <p>Description: Instances of this class are created by the {@link NailgunStreamHandler} when a nailgun request is received. It represents the contents of the request.</p> 
+ * <p>Description: Instances of this class are created by the {@link NailgunRequestDecoder} when a nailgun request is received. It represents the contents of the request.</p> 
  * <p>Company: Helios Development Group LLC</p>
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
  * <p><code>org.helios.nailgun.DefaultNailgunRequestImpl</code></p>

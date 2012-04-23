@@ -96,6 +96,8 @@ public class NailgunConstants {
 	 * Chunk type marker for client exit chunks
 	 */	
 	public static final byte CHUNKTYPE_EXIT = 'X';
+	
+
 
     /**
      * Chunk type marker for a "startinput" chunk.
