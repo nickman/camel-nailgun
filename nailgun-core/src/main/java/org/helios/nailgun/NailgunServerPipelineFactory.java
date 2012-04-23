@@ -27,8 +27,11 @@ package org.helios.nailgun;
 import static org.jboss.netty.channel.Channels.pipeline;
 
 import org.helios.nailgun.codecs.NailgunRequestDecoder;
+import org.helios.nailgun.codecs.NailgunRequestDispatcher;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
+import org.jboss.netty.handler.execution.ExecutionHandler;
+import org.jboss.netty.handler.execution.OrderedMemoryAwareThreadPoolExecutor;
 import org.jboss.netty.handler.logging.LoggingHandler;
 import org.jboss.netty.logging.InternalLogLevel;
 
@@ -41,7 +44,13 @@ import org.jboss.netty.logging.InternalLogLevel;
  */
 
 public class NailgunServerPipelineFactory implements ChannelPipelineFactory {
-
+	/** The request dispatcher */
+	protected final NailgunRequestDispatcher requestDispatcher = new NailgunRequestDispatcher();
+	/** The request executor which hands off the request to be processed by another thread */
+	protected final ExecutionHandler executionHandler = new ExecutionHandler(
+            new OrderedMemoryAwareThreadPoolExecutor(16, 1048576, 1048576));
+	/** The shareable nailgun request decoder */
+	protected final NailgunRequestDecoder requestDecoder = new NailgunRequestDecoder();
 	/**
 	 * {@inheritDoc}
 	 * @see org.jboss.netty.channel.ChannelPipelineFactory#getPipeline()
@@ -51,9 +60,10 @@ public class NailgunServerPipelineFactory implements ChannelPipelineFactory {
 		ChannelPipeline pipeline = pipeline();
 		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, true));
 		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
-		pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
-		pipeline.addLast("nailgun-decoder", new NailgunRequestDecoder());
-		
+		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
+		pipeline.addLast("nailgun-decoder", requestDecoder);
+		pipeline.addLast("nailgun-executor", executionHandler);
+		pipeline.addLast("nailgun-dispatcher", requestDispatcher);
 		return pipeline;
 	}
 

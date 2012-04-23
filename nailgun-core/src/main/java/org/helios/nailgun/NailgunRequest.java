@@ -49,10 +49,5 @@ public interface NailgunRequest {
 	 */
 	public abstract int getRemotePort();
 	
-	/*
-	 * InputStream  (reads from ng client), returns -1 on end of stream
-	 * onChannelClosed
-	 * -- How do we timeout when the ng client is not sending any input ?
-	 */
 
 }

@@ -26,6 +26,7 @@ package org.helios.nailgun;
 
 import java.io.Serializable;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -34,6 +35,7 @@ import java.util.Properties;
 import java.util.TreeMap;
 
 import org.helios.nailgun.codecs.NailgunRequestDecoder;
+import org.jboss.netty.channel.Channel;
 
 /**
  * <p>Title: DefaultNailgunRequestImpl</p>
@@ -54,10 +56,8 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	private final Properties environment = new Properties();
 	/** The caller's command line arguments */
 	private final List<String> arguments = new ArrayList<String>();
-    /** The caller's IP address */
-    private transient InetAddress remoteAddress = null;
-    /** The caller's port */
-    private transient int remotePort = -1;
+    /** The netty channel through which the client is communicating */
+    private transient Channel channel = null;
 	
 	
 	/**
@@ -213,7 +213,7 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 */
 	@Override
 	public InetAddress getRemoteAddress() {
-		return remoteAddress;
+		return channel==null ? null : ((InetSocketAddress)channel.getRemoteAddress()).getAddress();
 	}
 	
 	public String printEnvironment() {
@@ -225,33 +225,47 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 		return b.toString();
 	}
 
-
-	/**
-	 * Sets the caller's IP address
-	 * @param remoteAddress the remoteAddress to set
-	 */
-	public void setRemoteAddress(InetAddress remoteAddress) {
-		this.remoteAddress = remoteAddress;
-	}
-
-
 	/**
 	 * {@inheritDoc}
 	 * @see org.helios.nailgun.NailgunRequest#getRemotePort()
 	 */
 	@Override
 	public int getRemotePort() {
-		return remotePort;
+		return channel==null ? -1: ((InetSocketAddress)channel.getRemoteAddress()).getPort();
+	}
+	
+	/**
+	 * Returns the channel
+	 * @return the channel
+	 */
+	public Channel getChannel() {
+		return channel;
 	}
 
 
 	/**
-	 * Sets the caller's port
-	 * @param remotePort the remotePort to set
+	 * Sets the channel
+	 * @param channel the channel to set
 	 */
-	public void setRemotePort(int remotePort) {
-		this.remotePort = remotePort;
+	public void setChannel(Channel channel) {
+		this.channel = channel;
 	}
+	
+	/*
+	 * OnInputStreamStart
+	 * OnInoutStreamEOF
+	 * getAvailableBytes()
+	 * 
+	 * 
+	 * 
+	 * InputStream  (reads from ng client), returns -1 on end of stream
+	 * onChannelClosed
+	 * -- How do we timeout when the ng client is not sending any input ?
+	 */
+	
+	
+
+
 
 	/**
 	 * Constructs a <code>String</code> with all attributes
@@ -263,14 +277,17 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	public String toString() {
 	    final String TAB = "\n\t";
 	    StringBuilder retValue = new StringBuilder("DefaultNailgunRequestImpl [")
+	    	.append(TAB).append("channel:").append(this.channel)
 	        .append(TAB).append("command:").append(this.command)
 	        .append(TAB).append("workingDirectory:").append(this.workingDirectory)
 	        .append(TAB).append("environment:").append(this.environment.size()).append(" properties")
 	        .append(TAB).append("arguments:").append(this.arguments)
-	        .append(TAB).append("remoteAddress:").append(this.remoteAddress)
-	        .append(TAB).append("remotePort:").append(this.remotePort)
+	        .append(TAB).append("remoteAddress:").append(getRemoteAddress())
+	        .append(TAB).append("remotePort:").append(getRemotePort())
 	        .append("\n]");    
 	    return retValue.toString();
 	}
+
+
 	
 }

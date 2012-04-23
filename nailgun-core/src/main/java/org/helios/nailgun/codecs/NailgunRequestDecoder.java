@@ -24,16 +24,19 @@
  */
 package org.helios.nailgun.codecs;
 
-import java.net.InetSocketAddress;
-
 import org.helios.nailgun.NailgunConstants;
 import org.helios.nailgun.NailgunRequest;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFuture;
+import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.DownstreamMessageEvent;
+import org.jboss.netty.channel.UpstreamMessageEvent;
+import org.jboss.netty.channel.group.ChannelGroup;
+import org.jboss.netty.channel.group.DefaultChannelGroup;
 import org.jboss.netty.handler.codec.replay.ReplayingDecoder;
 import org.jboss.netty.logging.InternalLogger;
 import org.jboss.netty.logging.InternalLoggerFactory;
@@ -67,7 +70,8 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 	/** The signal to send the client when the stream input procesing is complete */
 	private static final ChannelBuffer STREAM_IN_DONE = ChannelBuffers.buffer(5);
 
-	
+	/** THe channel group where all active channels are maintained */
+	private final ChannelGroup channelGroup = new DefaultChannelGroup("NailgunServer");
 	
 	
 	static {
@@ -138,9 +142,13 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 		NailgunContextState context = getContext(ctx);
 		context.setState(decodeState);
 		if(context.getMessage().getRemoteAddress()==null) {
-			InetSocketAddress remote = (InetSocketAddress)channel.getRemoteAddress();
-			context.getMessage().setRemoteAddress(remote.getAddress());
-			context.getMessage().setRemotePort(remote.getPort());
+			channelGroup.add(channel);
+			channel.getCloseFuture().addListener(new ChannelFutureListener(){
+				public void operationComplete(ChannelFuture future) throws Exception {
+					channelGroup.remove(future.getChannel());
+				}
+			});
+			context.getMessage().setChannel(channel);
 		}
 		while(true) {
 			switch(context.getState()) {
@@ -179,16 +187,18 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 					
 					
 					// at this point, we can complete the Nailgun request
-					// and send it for dispatch.
+					// and send it for dispatch. However, since we have to kep processing
+					// a possible input stream from the client, we will keep the decoder looping
+					// on this request and simply send the NailgunRequest upstream. 
 					if(log.isDebugEnabled()) log.debug("Nailgun Client Complete:\n" + context.getMessage());
+					ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));
 					checkpoint(ctx, DecodingState.BYTES);
 					sendStartStdInSignal(ctx, channel);
-					try {
-						Thread.sleep(500);
-						log.info("Readable Bytes:" + buffer.readableBytes());
-					} catch (Exception e) {
-						log.error("Failed to pause and wait for STDIN", e);
-					}
+					// If the client has input to send:
+					// 		1. It will send a DecodingState.BYTES with the number of bytes to read
+					//		2. It will send a DecodingState.TYPE which will be either:
+					//			2a.  STDIN indicating the specified number of bytes should be read
+					//			2b.  STDIN_EOF indicating that the input stream is ended and no further bytes will be sent.
 					break;
 				case STDIN:
 					context.readBytes(buffer);					
