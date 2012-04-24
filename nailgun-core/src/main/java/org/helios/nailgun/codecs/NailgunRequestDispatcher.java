@@ -65,4 +65,5 @@ public class NailgunRequestDispatcher extends SimpleChannelUpstreamHandler {
 		}
 		NailgunRequest request = (NailgunRequest)message;
 	}
+	
 }
