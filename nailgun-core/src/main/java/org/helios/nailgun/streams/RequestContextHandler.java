@@ -22,36 +22,42 @@
  * 02110-1301 USA, or see the FSF site: http://www.fsf.org. 
  *
  */
-package org.helios.nailgun.handler;
+package org.helios.nailgun.streams;
 
 import org.helios.nailgun.NailgunRequest;
+import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.SimpleChannelDownstreamHandler;
+import org.jboss.netty.channel.ChannelEvent;
+import org.jboss.netty.channel.ChannelHandlerContext;
 
 /**
- * <p>Title: NailgunRequestHandler</p>
- * <p>Description: Defines a class that will handle a nailgun request.</p>
- * <p>Note that this interface does not specify any functionality regarding processing the inputstream sent from the nailgun client.</p>
- * <p>Request attributes and functionality exposed to a NailgunRequestHandler instance will be as follows:<ul>
- * 	<li>The command name, command arguments, IP address, port and environment of the calling client.</li>
- * 	<li>The handler can write STDOUT to the client</li>
- * 	<li>The handler can write STDERR to the client</li>
- * 	<li>The handler can write an exit code to the client</li>
- * </ul>
+ * <p>Title: RequestContextHandler</p>
+ * <p>Description: Attaches incoming {@link NailgunRequest}s to the channel handler context</p> 
  * <p>Company: Helios Development Group LLC</p>
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
- * <p><code>org.helios.nailgun.handler.NailgunRequestHandler</code></p>
+ * <p><code>org.helios.nailgun.streams.RequestContextHandler</code></p>
  */
-public interface NailgunRequestHandler {
-	/**
-	 * Invoked on a handler when a request has been fully decoded.
-	 * Note that when this method is called, there may still be pending input IO 
-	 * in the form of STDIN from the client.
-	 * @param request The request from a remote nailgun client.
-	 */
-	public void onNailgunRequest(NailgunRequest request);
+public class RequestContextHandler extends SimpleChannelDownstreamHandler {
+	/** The listening channel in the ng input stream handler */
+	protected final Channel listeningChannel;
 	
 	/**
-	 * Returns the command name implemented by this request handler
-	 * @return the command name
+	 * Creates a new RequestContextHandler
+	 * @param listeningChannel The listening channel in the ng input stream handler
 	 */
-	public String getCommandName();
+	public RequestContextHandler(Channel listeningChannel) {
+		this.listeningChannel = listeningChannel;
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 * @see org.jboss.netty.channel.ChannelDownstreamHandler#handleDownstream(org.jboss.netty.channel.ChannelHandlerContext, org.jboss.netty.channel.ChannelEvent)
+	 */
+	@Override
+	public void handleDownstream(ChannelHandlerContext ctx, ChannelEvent e) throws Exception {
+		// TODO Auto-generated method stub
+		
+	}
+
+
 }
