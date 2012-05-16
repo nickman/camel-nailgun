@@ -42,7 +42,7 @@ import org.jboss.netty.logging.InternalLoggerFactory;
 
 /**
  * <p>Title: CommandHandlerContainer</p>
- * <p>Description: </p> 
+ * <p>Description: A container for a command handling service.</p> 
  * <p>Company: Helios Development Group LLC</p>
  * @author Whitehead (nwhitehead AT heliosdev DOT org)
  * <p><code>org.helios.nailgun.handler.server.CommandHandlerContainer</code></p>
@@ -97,6 +97,10 @@ public class CommandHandlerContainer {
 				continue;
 			}
 		}
+	}
+	
+	public boolean supportsStreaming() {
+		return false;
 	}
 	
 	

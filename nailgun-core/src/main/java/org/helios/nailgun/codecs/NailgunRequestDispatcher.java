@@ -25,6 +25,7 @@
 package org.helios.nailgun.codecs;
 
 import org.helios.nailgun.NailgunRequest;
+import org.helios.nailgun.handler.server.LocalRequestRelay;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -64,6 +65,7 @@ public class NailgunRequestDispatcher extends SimpleChannelUpstreamHandler {
 			log.warn("RequestDispatcher received invalid message [" + message + "]");
 		}
 		NailgunRequest request = (NailgunRequest)message;
+		long key = LocalRequestRelay.getInstance().put(request);
 	}
 	
 }

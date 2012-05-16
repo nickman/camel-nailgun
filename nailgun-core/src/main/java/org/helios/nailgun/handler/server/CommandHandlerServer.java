@@ -46,7 +46,8 @@ public class CommandHandlerServer {
 	private static final Object lock = new Object();
 	/** The command handler map */
 	protected final Map<String, CommandHandler> commandHandlers = new ConcurrentHashMap<String, CommandHandler>();
-	
+	/** The server bootstrap */
+	protected final ServerBootstrap serverBootstrap;
 	/**
 	 * Acquires the {@link CommandHandlerServer} singleton instance
 	 * @return the {@link CommandHandlerServer} singleton instance
@@ -66,5 +67,6 @@ public class CommandHandlerServer {
 	 * Creates a new CommandHandlerServer
 	 */
 	private CommandHandlerServer() {
+		serverBootstrap = new ServerBootstrap();
 	}
 }
