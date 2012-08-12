@@ -52,19 +52,28 @@ public interface NailgunRequest {
 	/**
 	 * Returns a message back to the nail gun client's StdOut
 	 * @param message The message to return
+	 * @return this request
 	 */
-	public abstract void out(CharSequence message);
+	public abstract NailgunRequest out(CharSequence message);
 	
 	/**
 	 * Returns a message back to the nail gun client's StdErr
 	 * @param message The message to return
+	 * @return this request
 	 */
-	public abstract void err(CharSequence message);
+	public abstract NailgunRequest err(CharSequence message);
 	
 	/**
 	 * Terminates the response stream
+	 * @param exitCode The exit code to send the nailgun client
+	 */
+	public abstract void end(int exitCode);
+
+	/**
+	 * Terminates the response stream with an exit code of 0
 	 */
 	public abstract void end();
+	
 	
 
 }

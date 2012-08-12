@@ -63,6 +63,8 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	private final List<String> arguments = new ArrayList<String>();
     /** The netty channel through which the client is communicating */
     private transient Channel channel = null;
+    /** The presumed exit code set based on the last output */
+    private transient int exitCode = 0;
     
 	/** The name of the response encoding channel handler */
 	public static final String RESP_HANDLER = "response-encoder";
@@ -284,7 +286,8 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 * @see org.helios.nailgun.NailgunRequest#out(java.lang.CharSequence)
 	 */
 	@Override
-	public void out(CharSequence message) {
+	public NailgunRequest out(CharSequence message) {
+		exitCode = 0;
 		ChannelBuffer header = ChannelBuffers.buffer(5);
 		header.writeInt(message.length());
 		header.writeByte(NailgunConstants.CHUNKTYPE_STDOUT);
@@ -294,6 +297,7 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 				ChannelBuffers.copiedBuffer(message, Charset.defaultCharset())
 		);
 		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), response, channel.getRemoteAddress()));
+		return this;
 	}
 	
 	/**
@@ -301,7 +305,8 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 * @see org.helios.nailgun.NailgunRequest#err(java.lang.CharSequence)
 	 */
 	@Override
-	public void err(CharSequence message) {
+	public NailgunRequest err(CharSequence message) {
+		exitCode = -1;
 		ChannelBuffer header = ChannelBuffers.buffer(5);
 		header.writeInt(message.length());
 		header.writeByte(NailgunConstants.CHUNKTYPE_STDERR);
@@ -311,7 +316,7 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 				ChannelBuffers.copiedBuffer(message, Charset.defaultCharset())
 		);
 		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), response, channel.getRemoteAddress()));
-		
+		return this;
 	}
 	
 	/**
@@ -320,12 +325,21 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 */
 	@Override
 	public void end() {
-		ChannelBuffer header = ChannelBuffers.buffer(1);
-		header.writeByte(NailgunConstants.CHUNKTYPE_EXIT);
-		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), header, channel.getRemoteAddress()));
-		channel.close();
+		end(exitCode);
 	}
 	
+	/**
+	 * {@inheritDoc}
+	 * @see org.helios.nailgun.NailgunRequest#end(int)
+	 */
+	@Override
+	public void end(int exitCode) {
+		ChannelBuffer header = ChannelBuffers.buffer(5);
+		header.writeInt(exitCode);
+		header.writeByte(NailgunConstants.CHUNKTYPE_EXIT);
+		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), header, channel.getRemoteAddress()));
+		channel.close();		
+	}
 
 
 
