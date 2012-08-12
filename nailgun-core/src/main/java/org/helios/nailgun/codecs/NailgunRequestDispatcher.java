@@ -25,7 +25,8 @@
 package org.helios.nailgun.codecs;
 
 import org.helios.nailgun.NailgunRequest;
-import org.helios.nailgun.handler.server.LocalRequestRelay;
+import org.helios.nailgun.handler.NailgunRequestHandler;
+import org.helios.nailgun.handler.RequestHandlerRegistry;
 import org.jboss.netty.channel.ChannelHandlerContext;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
@@ -58,6 +59,7 @@ public class NailgunRequestDispatcher extends SimpleChannelUpstreamHandler {
 	 * {@inheritDoc}
 	 * @see org.jboss.netty.channel.SimpleChannelUpstreamHandler#messageReceived(org.jboss.netty.channel.ChannelHandlerContext, org.jboss.netty.channel.MessageEvent)
 	 */
+	@Override
 	public void messageReceived(ChannelHandlerContext ctx, MessageEvent e) {
 		System.out.println("[" + Thread.currentThread().toString() + "] Processing NailgunRequest:\n" + e.getMessage());
 		Object message = e.getMessage();
@@ -65,7 +67,12 @@ public class NailgunRequestDispatcher extends SimpleChannelUpstreamHandler {
 			log.warn("RequestDispatcher received invalid message [" + message + "]");
 		}
 		NailgunRequest request = (NailgunRequest)message;
-		long key = LocalRequestRelay.getInstance().put(request);
+		NailgunRequestHandler handler = RequestHandlerRegistry.getInstance().lookup(request);
+		if(handler==null) {
+			request.err("No Command Handler for " + request.getCommand()+"\n").end();
+		} else {
+			handler.onNailgunRequest(request);
+		}
 	}
 	
 }
