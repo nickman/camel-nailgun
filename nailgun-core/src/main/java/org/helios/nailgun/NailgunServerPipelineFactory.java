@@ -30,6 +30,7 @@ import org.helios.nailgun.codecs.NailgunRequestDecoder;
 import org.helios.nailgun.codecs.NailgunRequestDispatcher;
 import org.jboss.netty.channel.ChannelPipeline;
 import org.jboss.netty.channel.ChannelPipelineFactory;
+import org.jboss.netty.handler.codec.string.StringEncoder;
 import org.jboss.netty.handler.execution.ExecutionHandler;
 import org.jboss.netty.handler.execution.OrderedMemoryAwareThreadPoolExecutor;
 import org.jboss.netty.handler.logging.LoggingHandler;
@@ -51,6 +52,9 @@ public class NailgunServerPipelineFactory implements ChannelPipelineFactory {
             new OrderedMemoryAwareThreadPoolExecutor(16, 1048576, 1048576));
 	/** The shareable nailgun request decoder */
 	protected final NailgunRequestDecoder requestDecoder = new NailgunRequestDecoder();
+	/** The shareable response encoder */
+	protected final StringEncoder responseEncoder = new StringEncoder();
+	
 	/**
 	 * {@inheritDoc}
 	 * @see org.jboss.netty.channel.ChannelPipelineFactory#getPipeline()
@@ -58,9 +62,10 @@ public class NailgunServerPipelineFactory implements ChannelPipelineFactory {
 	@Override
 	public ChannelPipeline getPipeline() throws Exception {
 		ChannelPipeline pipeline = pipeline();
-		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, true));
+		pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, true));
 		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
 		//pipeline.addLast("nailgun-logger", new LoggingHandler(InternalLogLevel.INFO, false));
+		//pipeline.addLast("response-encoder", responseEncoder);
 		pipeline.addLast("nailgun-decoder", requestDecoder);
 		pipeline.addLast("nailgun-executor", executionHandler);
 		pipeline.addLast("nailgun-dispatcher", requestDispatcher);

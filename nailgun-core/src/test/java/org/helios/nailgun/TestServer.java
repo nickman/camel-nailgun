@@ -25,13 +25,15 @@
 package org.helios.nailgun;
 import java.net.InetSocketAddress;
 import java.util.concurrent.Executors;
-import java.util.logging.ConsoleHandler;
-import java.util.logging.Level;
 import java.util.logging.Logger;
 
 import org.helios.nailgun.codecs.NailgunRequestDecoder;
+import org.helios.nailgun.handler.RequestHandlerRegistry;
+import org.helios.nailgun.handler.impl.jmx.JMXCommandHandler;
 import org.jboss.netty.bootstrap.ServerBootstrap;
 import org.jboss.netty.channel.socket.nio.NioServerSocketChannelFactory;
+import org.jboss.netty.logging.InternalLoggerFactory;
+import org.jboss.netty.logging.Slf4JLoggerFactory;
 import org.junit.Ignore;
 /**
  * <p>Title: TestServer</p>
@@ -47,18 +49,11 @@ public class TestServer {
 	 * @param args
 	 */
 	public static void main(String[] args) {
+		InternalLoggerFactory.setDefaultFactory(new Slf4JLoggerFactory());
 		log("NailGun Test Server");
 		// Set the logging level for the stream handler
 		Logger log = Logger.getLogger(NailgunRequestDecoder.class.getName());
-		log.setLevel(Level.FINE);
-		
-		ConsoleHandler handler = new ConsoleHandler();
-		handler.setLevel(Level.FINE);
-		log.addHandler(handler);
-
-		
-		log.fine("Logging Configured");
-		
+		 
 		//LogManager.getLogManager().getLogger(NailgunRequestDecoder.class.getName()).setLevel(Level.FINEST);
 		ServerBootstrap bootstrap = new ServerBootstrap(
 				new NioServerSocketChannelFactory(
@@ -71,6 +66,7 @@ public class TestServer {
 		// Bind and start to accept incoming connections.
 		InetSocketAddress isock = new InetSocketAddress("0.0.0.0", NailgunConstants.DEFAULT_PORT);
 		bootstrap.bind(isock);
+		RequestHandlerRegistry.getInstance().register(new JMXCommandHandler());
 		System.out.println("Nailgun Server Started on [" + isock + "]");		
 	}
 	

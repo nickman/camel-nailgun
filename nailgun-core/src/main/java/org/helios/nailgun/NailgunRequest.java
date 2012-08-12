@@ -49,5 +49,22 @@ public interface NailgunRequest {
 	 */
 	public abstract int getRemotePort();
 	
+	/**
+	 * Returns a message back to the nail gun client's StdOut
+	 * @param message The message to return
+	 */
+	public abstract void out(CharSequence message);
+	
+	/**
+	 * Returns a message back to the nail gun client's StdErr
+	 * @param message The message to return
+	 */
+	public abstract void err(CharSequence message);
+	
+	/**
+	 * Terminates the response stream
+	 */
+	public abstract void end();
+	
 
 }

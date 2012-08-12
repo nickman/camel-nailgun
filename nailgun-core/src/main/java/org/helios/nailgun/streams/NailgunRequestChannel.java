@@ -274,4 +274,22 @@ public class NailgunRequestChannel implements LocalServerChannel {
 		return innerChannel.setReadable(readable);
 	}
 
+	/**
+	 * {@inheritDoc}
+	 * @see org.jboss.netty.channel.Channel#getAttachment()
+	 */
+	@Override
+	public Object getAttachment() {
+		return innerChannel.getAttachment();
+	}
+
+	/**
+	 * {@inheritDoc}
+	 * @see org.jboss.netty.channel.Channel#setAttachment(java.lang.Object)
+	 */
+	@Override
+	public void setAttachment(Object attachment) {
+		innerChannel.setAttachment(attachment); 
+	}
+
 }

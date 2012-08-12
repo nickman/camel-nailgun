@@ -128,6 +128,7 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 		if(log.isDebugEnabled()) log.debug("checkpoint:" + state);
 	}
 	
+	@Override
 	protected void checkpoint(DecodingState state) {
 		super.checkpoint(state);
 	}
@@ -144,6 +145,7 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 		if(context.getMessage().getRemoteAddress()==null) {
 			channelGroup.add(channel);
 			channel.getCloseFuture().addListener(new ChannelFutureListener(){
+				@Override
 				public void operationComplete(ChannelFuture future) throws Exception {
 					channelGroup.remove(future.getChannel());
 				}

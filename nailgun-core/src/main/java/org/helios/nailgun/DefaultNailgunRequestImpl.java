@@ -27,6 +27,7 @@ package org.helios.nailgun;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
+import java.nio.charset.Charset;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
@@ -35,7 +36,11 @@ import java.util.Properties;
 import java.util.TreeMap;
 
 import org.helios.nailgun.codecs.NailgunRequestDecoder;
+import org.jboss.netty.buffer.ChannelBuffer;
+import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.Channels;
+import org.jboss.netty.channel.DownstreamMessageEvent;
 
 /**
  * <p>Title: DefaultNailgunRequestImpl</p>
@@ -58,6 +63,10 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	private final List<String> arguments = new ArrayList<String>();
     /** The netty channel through which the client is communicating */
     private transient Channel channel = null;
+    
+	/** The name of the response encoding channel handler */
+	public static final String RESP_HANDLER = "response-encoder";
+    
 	
 	
 	/**
@@ -263,6 +272,59 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 * -- How do we timeout when the ng client is not sending any input ?
 	 */
 	
+	/*
+	 *             writeInt(len);
+            writeByte(streamCode);
+			out.write(b, offset, len);
+
+	 */
+	
+	/**
+	 * {@inheritDoc}
+	 * @see org.helios.nailgun.NailgunRequest#out(java.lang.CharSequence)
+	 */
+	@Override
+	public void out(CharSequence message) {
+		ChannelBuffer header = ChannelBuffers.buffer(5);
+		header.writeInt(message.length());
+		header.writeByte(NailgunConstants.CHUNKTYPE_STDOUT);
+		
+		ChannelBuffer response = ChannelBuffers.wrappedBuffer(
+				header,
+				ChannelBuffers.copiedBuffer(message, Charset.defaultCharset())
+		);
+		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), response, channel.getRemoteAddress()));
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 * @see org.helios.nailgun.NailgunRequest#err(java.lang.CharSequence)
+	 */
+	@Override
+	public void err(CharSequence message) {
+		ChannelBuffer header = ChannelBuffers.buffer(5);
+		header.writeInt(message.length());
+		header.writeByte(NailgunConstants.CHUNKTYPE_STDERR);
+		
+		ChannelBuffer response = ChannelBuffers.wrappedBuffer(
+				header,
+				ChannelBuffers.copiedBuffer(message, Charset.defaultCharset())
+		);
+		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), response, channel.getRemoteAddress()));
+		
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 * @see org.helios.nailgun.NailgunRequest#end()
+	 */
+	@Override
+	public void end() {
+		ChannelBuffer header = ChannelBuffers.buffer(1);
+		header.writeByte(NailgunConstants.CHUNKTYPE_EXIT);
+		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), header, channel.getRemoteAddress()));
+		channel.close();
+	}
 	
 
 
@@ -274,6 +336,7 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 * @return a <code>String</code> representation 
 	 * of this object.
 	 */
+	@Override
 	public String toString() {
 	    final String TAB = "\n\t";
 	    StringBuilder retValue = new StringBuilder("DefaultNailgunRequestImpl [")
