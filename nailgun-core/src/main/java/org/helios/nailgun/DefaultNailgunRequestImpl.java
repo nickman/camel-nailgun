@@ -24,6 +24,10 @@
  */
 package org.helios.nailgun;
 
+import java.io.IOException;
+import java.io.OutputStream;
+import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.InetSocketAddress;
@@ -281,6 +285,27 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 
 	 */
 	
+	/** The output stream used when the command handler wishes to read the nailgun input stream as an output stream */
+	protected transient PipedOutputStream pipeOut = null;
+	
+	/**
+	 * Initializes the output stream for the command handler to read
+	 * @param pipeIn The decoder supplied input stream
+	 * @throws IOException Thrown if the pipe setup fails
+	 */
+	public void initPipe(PipedInputStream pipeIn) throws IOException {
+		pipeOut = new PipedOutputStream(pipeIn);
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 * @see org.helios.nailgun.NailgunRequest#getOutputStream()
+	 */
+	@Override
+	public OutputStream getOutputStream() {
+		return pipeOut;
+	}
+	
 	/**
 	 * {@inheritDoc}
 	 * @see org.helios.nailgun.NailgunRequest#out(java.lang.CharSequence)
@@ -306,7 +331,7 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 */
 	@Override
 	public NailgunRequest err(CharSequence message) {
-		exitCode = -1;
+		exitCode = 1;
 		ChannelBuffer header = ChannelBuffers.buffer(5);
 		header.writeInt(message.length());
 		header.writeByte(NailgunConstants.CHUNKTYPE_STDERR);
@@ -334,9 +359,10 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 */
 	@Override
 	public void end(int exitCode) {
-		ChannelBuffer header = ChannelBuffers.buffer(5);
-		header.writeInt(exitCode);
+		ChannelBuffer header = ChannelBuffers.buffer(9);
+		header.writeInt(9);
 		header.writeByte(NailgunConstants.CHUNKTYPE_EXIT);
+		header.writeInt(exitCode);
 		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), header, channel.getRemoteAddress()));
 		channel.close();		
 	}

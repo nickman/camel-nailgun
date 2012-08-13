@@ -1,5 +1,6 @@
 package org.helios.nailgun;
 
+import java.io.OutputStream;
 import java.net.InetAddress;
 import java.util.Properties;
 
@@ -48,6 +49,13 @@ public interface NailgunRequest {
 	 * @return the remotePort
 	 */
 	public abstract int getRemotePort();
+	
+	/**
+	 * Returns an output stream that provides the streamed data feed from a nailgun client.
+	 * If the nailgun client call did not send a stream, this output stream immediately returns a <code>-1</code>.
+	 * @return an OutputStream feeding the nailgun client streamed input
+	 */
+	public abstract OutputStream getOutputStream();
 	
 	/**
 	 * Returns a message back to the nail gun client's StdOut

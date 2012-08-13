@@ -155,9 +155,17 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 		while(true) {
 			switch(context.getState()) {
 				case BYTES:
-					context.setBytesToRead(buffer.readInt());
-					checkpoint(ctx, DecodingState.TYPE);	
-					if(log.isDebugEnabled()) log.debug("NG Chunk [BYTES]:" + context.getBytesToRead());
+					// set the output stream in the nailgun request,
+					// create the piped input stream and connect it to the output stream
+					// and send the request upstream		
+					int bytesToRead = buffer.readInt();
+					if(log.isDebugEnabled()) log.debug("NG Chunk [BYTES]:" + bytesToRead);
+					context.setBytesToRead(bytesToRead);  
+					if(context.isStdInReady()) {
+						context.initInputStream(bytesToRead);
+						ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));												
+					}
+					checkpoint(ctx, DecodingState.TYPE);
 					break;
 				case TYPE:
 					context.setChunkType(buffer.readByte());
@@ -193,9 +201,10 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 					// a possible input stream from the client, we will keep the decoder looping
 					// on this request and simply send the NailgunRequest upstream. 
 					if(log.isDebugEnabled()) log.debug("Nailgun Client Complete:\n" + context.getMessage());
-					ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));
+					//ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));
 					checkpoint(ctx, DecodingState.BYTES);
 					sendStartStdInSignal(ctx, channel);
+					context.setStdInReady(true);
 					// If the client has input to send:
 					// 		1. It will send a DecodingState.BYTES with the number of bytes to read
 					//		2. It will send a DecodingState.TYPE which will be either:
@@ -203,9 +212,10 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 					//			2b.  STDIN_EOF indicating that the input stream is ended and no further bytes will be sent.
 					break;
 				case STDIN:
-					context.readBytes(buffer);					
-					System.out.println("INSTREAM:" + new String(context.getBytes()));
-					checkpoint(ctx, DecodingState.BYTES);							
+					log.info("STDIN Bytes To Read:" + context.getBytesToRead());
+					byte[] stdin = new byte[context.getBytesToRead()];
+					buffer.readBytes(stdin);
+					checkpoint(ctx, DecodingState.TYPE);							
 				case STDIN_EOF:
 					// this means that the std in has completed
 					System.out.println("INSTREAM  COMPLETE");
