@@ -28,6 +28,7 @@ import org.helios.nailgun.NailgunRequest;
 import org.helios.nailgun.handler.NailgunRequestHandler;
 import org.helios.nailgun.handler.RequestHandlerRegistry;
 import org.jboss.netty.channel.ChannelHandlerContext;
+import org.jboss.netty.channel.ExceptionEvent;
 import org.jboss.netty.channel.MessageEvent;
 import org.jboss.netty.channel.SimpleChannelUpstreamHandler;
 import org.jboss.netty.logging.InternalLogger;
@@ -73,6 +74,16 @@ public class NailgunRequestDispatcher extends SimpleChannelUpstreamHandler {
 		} else {
 			handler.onNailgunRequest(request);
 		}
+	}
+	
+	/**
+	 * {@inheritDoc}
+	 * @see org.jboss.netty.channel.SimpleChannelUpstreamHandler#exceptionCaught(org.jboss.netty.channel.ChannelHandlerContext, org.jboss.netty.channel.ExceptionEvent)
+	 */
+	@Override
+	public void exceptionCaught(ChannelHandlerContext ctx, ExceptionEvent e) throws Exception {
+		log.error("Exception handling request dispatch in context [" + ctx + "]", e.getCause());
+		//super.exceptionCaught(ctx, e);
 	}
 	
 }

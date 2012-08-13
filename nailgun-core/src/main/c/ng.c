@@ -131,6 +131,9 @@ void freeArray(Array *a) {
 }
 
 
+
+u_short DEBUG = 0;                /* DEBUG statement flag */
+
 /* the socket connected to the nailgun server */
 int nailgunsocket = 0;
 
@@ -369,6 +372,7 @@ void processExit(char *buf, unsigned long len) {
  * @param len the number of bytes to send
  */
 void sendStdin(char *buf, unsigned int len) {
+	if(DEBUG) printf("DEBUG: Sending StndIn: Length[%i]\n", len);
   sendHeader(len, CHUNKTYPE_STDIN);
   sendAll(nailgunsocket, buf, len);
 }
@@ -386,18 +390,29 @@ void processEof() {
  * Thread main for reading from stdin and sending
  */
 DWORD WINAPI processStdin (LPVOID lpParameter) {
-  /* buffer used for reading and sending stdin chunks */
+  /* buffer used for reading and sending stdin chunks */  
   char wbuf[BUFSIZE];
 
+	if(DEBUG) printf("DEBUG: Starting WIN STDIN\n");
   for (;;) {
     DWORD numberOfBytes = 0;
-
+		
+		/*
+		if(GetFileSize(NG_STDIN_FILENO, &numberOfBytes)) {
+			if(DEBUG) printf("\tDEBUG: WIN STDIN Available:%u\n", numberOfBytes);
+		} else {
+			
+		}
+		*/
+		
+		
+		
     if (!ReadFile(NG_STDIN_FILENO, wbuf, BUFSIZE, &numberOfBytes, NULL)) {
       if (numberOfBytes != 0) {
         handleError();
       }
     }
-
+		
     if (numberOfBytes > 0) {
       sendStdin(wbuf, numberOfBytes);
     } else {
@@ -491,7 +506,7 @@ void processnailgunstream() {
       | ((buf[3]) & 0x000000ff);
 
     chunkType = buf[4];
-
+		if(DEBUG) printf("\tDEBUG Processing Chunk Type [%i]\n", chunkType); 
     switch(chunkType) {
       case CHUNKTYPE_STDOUT: recvToFD(NG_STDOUT_FILENO, buf, len);
             break;
@@ -555,7 +570,7 @@ void usage(int exitcode) {
 
   fprintf(stderr, "where options include:\n");
   fprintf(stderr, "   --env<name>=<value>       set/override a client environment variable\n");
-  fprintf(stderr, "   --me                      send minimal environment\n");
+  fprintf(stderr, "   --ae                      send full environment\n");
   fprintf(stderr, "   --version                 print product version and exit\n");
   fprintf(stderr, "   --showversion             print product version and continue\n");
   fprintf(stderr, "   --server                  to specify the address of the nailgun server\n");
@@ -580,7 +595,8 @@ int main(int argc, char *argv[], char *env[]) {
   char *nailgun_port;          /* port as specified by user */
   char *cwd;
   u_short port;                /* port */
-  u_short minEnv = 0;                /* the min env flag */
+  u_short allEnv = 0;                /* the all env flag */
+  
   struct hostent *hostinfo;
   char *cmd;
   int firstArgIndex;           /* the first argument _to pass to the server_ */
@@ -654,8 +670,10 @@ int main(int argc, char *argv[], char *env[]) {
     } else if (!strcmp("--showversion", argv[i])) {
       printf("NailGun client version %s\n", NAILGUN_VERSION);
       argv[i] = NULL;
-    } else if(!strcmp("--me", argv[i])) {
-        minEnv = 1;
+    } else if(!strcmp("--ae", argv[i])) {
+        allEnv = 1;
+    } else if(!strcmp("--DEBUG", argv[i])) {
+        DEBUG = 1;
     } else if (!strcmp("--help", argv[i])) {
       usage(0);
     } else if (cmd == NULL) {
@@ -709,16 +727,18 @@ int main(int argc, char *argv[], char *env[]) {
     }
   }
 
-  /* now send environment */
+  /* now send environment */  
+  if(DEBUG) printf("DEBUG: Sending Environment\n");
   sendText(CHUNKTYPE_ENV, NAILGUN_FILESEPARATOR);
   sendText(CHUNKTYPE_ENV, NAILGUN_PATHSEPARATOR);
-  if(minEnv==0) {
-      printf("Sending full environment");
+  if(allEnv==1) {
+      if(DEBUG) printf("DEBUG: FULL environment\n"); 
       for(i = 0; env[i]; ++i) {
+      	if(DEBUG) printf("\tSending Env Entry [%s]\n", env[i]); 
         sendText(CHUNKTYPE_ENV, env[i]);
       }
   } else {
-    printf("Sending minimal environment");
+    /* printf("Sending minimal environment"); */
   }
 
   /* now send the working directory */

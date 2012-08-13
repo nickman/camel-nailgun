@@ -161,16 +161,17 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 					int bytesToRead = buffer.readInt();
 					if(log.isDebugEnabled()) log.debug("NG Chunk [BYTES]:" + bytesToRead);
 					context.setBytesToRead(bytesToRead);  
-					if(context.isStdInReady()) {
-						context.initInputStream(bytesToRead);
-						ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));												
-					}
+//					if(context.isStdInReady()) {
+//						context.initOutputStream(bytesToRead);
+//						ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));												
+//					}
 					checkpoint(ctx, DecodingState.TYPE);
 					break;
 				case TYPE:
-					context.setChunkType(buffer.readByte());
+					byte type = buffer.readByte();
+					context.setChunkType(type);
 					checkpoint(ctx, context.getState());
-					if(log.isDebugEnabled()) log.debug("NG Chunk [TYPE]:" + context.getState());					
+					if(log.isDebugEnabled()) log.debug("NG Chunk [TYPE]:" + NailgunConstants.decode(type));					
 					break;
 				case WORKING_DIR:
 					context.readBytes(buffer);
@@ -201,27 +202,31 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 					// a possible input stream from the client, we will keep the decoder looping
 					// on this request and simply send the NailgunRequest upstream. 
 					if(log.isDebugEnabled()) log.debug("Nailgun Client Complete:\n" + context.getMessage());
-					//ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));
+					ctx.sendUpstream(new UpstreamMessageEvent(channel, context.getMessage(), channel.getRemoteAddress()));
 					checkpoint(ctx, DecodingState.BYTES);
-					sendStartStdInSignal(ctx, channel);
 					context.setStdInReady(true);
+//					sendStartStdInSignal(ctx, channel);
+					
 					// If the client has input to send:
 					// 		1. It will send a DecodingState.BYTES with the number of bytes to read
 					//		2. It will send a DecodingState.TYPE which will be either:
-					//			2a.  STDIN indicating the specified number of bytes should be read
+					//			2a.  STDIN the bytes to be read
 					//			2b.  STDIN_EOF indicating that the input stream is ended and no further bytes will be sent.
 					break;
 				case STDIN:
 					log.info("STDIN Bytes To Read:" + context.getBytesToRead());
-					byte[] stdin = new byte[context.getBytesToRead()];
+					context.initOutputStream(context.getBytesToRead());
+					byte[] stdin = new byte[context.getBytesToRead()-2];					
 					buffer.readBytes(stdin);
+					buffer.readByte();  buffer.readByte();
+					context.writeStdin(stdin);
 					checkpoint(ctx, DecodingState.TYPE);							
 				case STDIN_EOF:
 					// this means that the std in has completed
-					System.out.println("INSTREAM  COMPLETE");
-					if(log.isDebugEnabled()) log.debug("NG Chunk [" + context.getState() + "]");
+					if(log.isDebugEnabled()) log.debug("STDIN EOF: NG Chunk [" + context.getState() + "]");
+					context.closeStdIn();
 					reset(ctx);
-					sendCompletedStdInSignal(ctx, channel);
+					//sendCompletedStdInSignal(ctx, channel);
 					return null;
 //				case STARTINPUT:
 //					channel.write(NailgunConstants.CHUNKTYPE_STARTINPUT).awaitUninterruptibly();
@@ -263,6 +268,20 @@ public class NailgunRequestDecoder extends ReplayingDecoder<DecodingState>  {
 			}
 		}
 	}
+	
+	/**
+CHUNKTYPE_ARGUMENT:65:A
+CHUNKTYPE_ENVIRONMENT:69:E
+CHUNKTYPE_COMMAND:67:C
+CHUNKTYPE_WORKINGDIRECTORY:68:D
+CHUNKTYPE_STDIN:48:0
+CHUNKTYPE_STDIN_EOF:46:.
+CHUNKTYPE_STDOUT:49:1
+CHUNKTYPE_STDERR:50:2
+CHUNKTYPE_EXIT:88:X
+CHUNKTYPE_STARTINPUT:83:S
+
+	 */
 	
 	/**
 	 * Sends a signal back to the nailgun client indicating that we're ready to accept the input stream

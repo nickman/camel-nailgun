@@ -24,12 +24,15 @@
  */
 package org.helios.nailgun.handler.impl.jmx;
 
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
 import java.lang.management.ManagementFactory;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.TimeUnit;
 
 import javax.management.Attribute;
 import javax.management.AttributeList;
@@ -72,7 +75,7 @@ public class JMXCommandHandler implements NailgunRequestHandler {
 			if(name==null) name = DEFAULT_DOMAIN;
 			mbeanConnections.put(name, server);
 		}
-		if(mbeanConnections.size()<1) {
+		if(mbeanConnections.size()<1 || !mbeanConnections.containsKey(DEFAULT_DOMAIN)) {
 			mbeanConnections.put(DEFAULT_DOMAIN, ManagementFactory.getPlatformMBeanServer());
 		}
 		log.debug("Created " + getClass().getName() + " with " + mbeanConnections.size() + " MBeanServers");
@@ -96,6 +99,25 @@ public class JMXCommandHandler implements NailgunRequestHandler {
 		return conn;
 	}
 	
+	// 48, 65, 6c, 6c, 6f
+	
+	protected void readInputStream(NailgunRequest request) {
+		try {
+			InputStream is = request.getInputStream(5000, TimeUnit.MILLISECONDS);
+			byte[] buff = new byte[1024];
+			ByteArrayOutputStream baos = new ByteArrayOutputStream();
+			int bytesRead = -1;
+			int totalBytesRead = 0;
+			while((bytesRead = is.read(buff))!=-1) {
+				baos.write(buff, 0, bytesRead);
+				totalBytesRead += bytesRead;
+			}
+			log.info("STDIN (" + totalBytesRead + ")  [" + baos.toString() + "]");
+			request.out("Content:" + baos.toString() + "\n");
+		} catch (Exception e) {
+			log.error("Failed to read input stream", e);
+		}
+	}
 	
 	/**
 	 * <p>Arguments: <ol>
@@ -107,9 +129,10 @@ public class JMXCommandHandler implements NailgunRequestHandler {
 	 * @see org.helios.nailgun.handler.NailgunRequestHandler#onNailgunRequest(org.helios.nailgun.NailgunRequest)
 	 */
 	@Override
-	public void onNailgunRequest(NailgunRequest request) {
+	public void onNailgunRequest(NailgunRequest request) {		
 		if(request==null) throw new IllegalArgumentException("The passed request was null", new Throwable());
 		if(log.isDebugEnabled()) log.debug("Processing request " + Arrays.toString(request.getArguments()));
+		readInputStream(request);
 		//DOMAIN_ARG_PREFIX
 		String[] args = request.getArguments();
 		try {
@@ -146,6 +169,12 @@ public class JMXCommandHandler implements NailgunRequestHandler {
 				String[] attrs = attrNames.toArray(new String[0]);
 				if(server==null) server = getServer(DEFAULT_DOMAIN);
 				boolean isPattern = on.isPattern();
+				if(!isPattern) {
+					if(!server.isRegistered(on)) {
+						request.err("[JMXCommandHandler] Request failed. Invalid ObjectName [" + on + "]");
+						return;
+					}
+				}
 				StringBuilder b = new StringBuilder();
 				for(ObjectName objectName: server.queryNames(on, null)) {
 					if(isPattern) b.append(objectName.toString()).append("\n=============\n");

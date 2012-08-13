@@ -25,7 +25,7 @@
 package org.helios.nailgun;
 
 import java.io.IOException;
-import java.io.OutputStream;
+import java.io.InputStream;
 import java.io.PipedInputStream;
 import java.io.PipedOutputStream;
 import java.io.Serializable;
@@ -38,11 +38,14 @@ import java.util.List;
 import java.util.Map;
 import java.util.Properties;
 import java.util.TreeMap;
+import java.util.concurrent.TimeUnit;
 
 import org.helios.nailgun.codecs.NailgunRequestDecoder;
+import org.helios.nailgun.streams.ConnectTimeoutPipedInputStream;
 import org.jboss.netty.buffer.ChannelBuffer;
 import org.jboss.netty.buffer.ChannelBuffers;
 import org.jboss.netty.channel.Channel;
+import org.jboss.netty.channel.ChannelFutureListener;
 import org.jboss.netty.channel.Channels;
 import org.jboss.netty.channel.DownstreamMessageEvent;
 
@@ -72,6 +75,15 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
     
 	/** The name of the response encoding channel handler */
 	public static final String RESP_HANDLER = "response-encoder";
+	
+	/** The signal to send the client when we're ready to handle the stream input */
+	private static final ChannelBuffer STREAM_IN_READY = ChannelBuffers.buffer(5);
+	
+	static {
+		// Prep the stream in readiness buffer
+		STREAM_IN_READY.writeInt(0);
+		STREAM_IN_READY.writeByte(NailgunConstants.CHUNKTYPE_STARTINPUT);
+	}
     
 	
 	
@@ -285,26 +297,41 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 
 	 */
 	
-	/** The output stream used when the command handler wishes to read the nailgun input stream as an output stream */
-	protected transient PipedOutputStream pipeOut = null;
+	/** The input stream used when the command handler wishes to read the nailgun input stream as an output stream */
+	protected transient ConnectTimeoutPipedInputStream pipeIn = null;
 	
-	/**
-	 * Initializes the output stream for the command handler to read
-	 * @param pipeIn The decoder supplied input stream
-	 * @throws IOException Thrown if the pipe setup fails
-	 */
-	public void initPipe(PipedInputStream pipeIn) throws IOException {
-		pipeOut = new PipedOutputStream(pipeIn);
-	}
 	
 	/**
 	 * {@inheritDoc}
-	 * @see org.helios.nailgun.NailgunRequest#getOutputStream()
+	 * @see org.helios.nailgun.NailgunRequest#getInputStream()
 	 */
 	@Override
-	public OutputStream getOutputStream() {
-		return pipeOut;
+	public InputStream getInputStream(long timeout, TimeUnit unit) {
+		if(pipeIn==null) {
+			pipeIn = new ConnectTimeoutPipedInputStream(timeout, unit);
+			sendStartStdInSignal();
+		}
+		return pipeIn;
 	}
+	
+	/**
+	 * Sends a signal back to the nailgun client indicating that we're ready to accept the input stream
+	 * @param ctx The ChannelHandlerContext
+	 * @param channel The channel
+	 */
+	protected void sendStartStdInSignal() {
+		DownstreamMessageEvent dme = new DownstreamMessageEvent(channel, Channels.future(channel), STREAM_IN_READY, channel.getRemoteAddress());
+		//channel.getPipeline().sendDownstream(dme);
+		System.out.println("Sending STDIN READY");
+		channel.write(STREAM_IN_READY).awaitUninterruptibly();
+		System.out.println("Sent STDIN READY");
+	}
+	
+	public void connectPipes(PipedOutputStream pipeOut, PipedInputStream delegatePipeIn) throws IOException {
+		delegatePipeIn.connect(pipeOut);
+		pipeIn.setPipeIn(delegatePipeIn);		
+	}
+	
 	
 	/**
 	 * {@inheritDoc}
@@ -359,12 +386,15 @@ public class DefaultNailgunRequestImpl implements Serializable, NailgunRequest {
 	 */
 	@Override
 	public void end(int exitCode) {
-		ChannelBuffer header = ChannelBuffers.buffer(9);
-		header.writeInt(9);
+		byte[] msg = ("" + exitCode + "\n").getBytes();
+		ChannelBuffer header = ChannelBuffers.buffer(msg.length + 5);
+		header.writeInt(msg.length);
 		header.writeByte(NailgunConstants.CHUNKTYPE_EXIT);
-		header.writeInt(exitCode);
-		channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), header, channel.getRemoteAddress()));
-		channel.close();		
+		header.writeBytes(msg);
+		
+		//channel.getPipeline().sendDownstream(new DownstreamMessageEvent(channel, Channels.future(channel), header, channel.getRemoteAddress()));
+		channel.write(header).addListener(ChannelFutureListener.CLOSE);
+		//channel.close();		
 	}
 
 

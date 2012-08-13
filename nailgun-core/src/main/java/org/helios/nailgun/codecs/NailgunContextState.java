@@ -26,6 +26,7 @@ package org.helios.nailgun.codecs;
 
 import java.io.IOException;
 import java.io.PipedInputStream;
+import java.io.PipedOutputStream;
 
 import org.helios.nailgun.DefaultNailgunRequestImpl;
 import org.jboss.netty.buffer.ChannelBuffer;
@@ -64,19 +65,22 @@ public class NailgunContextState {
 	/** Indicates if the request decoder is ready to stream STDIN */
 	private boolean stdInReady = false;
 
-	/** The piped input stream to stream the nailgun client's input stream */
-	private PipedInputStream pipeIn = null;
+	/** The piped output stream to stream the nailgun client's input stream */
+	private PipedOutputStream pipeOut = null;
 	
 	/**
-	 * Initializes the piped input stream
+	 * Initializes the piped output stream
 	 * @param initialSize The nailgun supplied byte count
 	 */
-	protected void initInputStream(int initialSize) {
-		pipeIn = new PipedInputStream(initialSize);
-		try {
-			message.initPipe(pipeIn);
-		} catch (IOException ioe) {
-			throw new RuntimeException("Failed to initialize nailgun stream pipe", ioe);
+	protected void initOutputStream(int initialSize) {
+		if(pipeOut==null) {
+			pipeOut = new PipedOutputStream();
+			PipedInputStream pipeIn = new PipedInputStream(initialSize);
+			try {
+				message.connectPipes(pipeOut, pipeIn);
+			} catch (IOException ioe) {
+				throw new RuntimeException("Failed to initialize nailgun stream pipe", ioe);
+			}
 		}
 	}
 	
@@ -116,6 +120,8 @@ public class NailgunContextState {
 		state = null;
 		chunkType = -10;
 		bytesToRead = -1;
+		try { pipeOut.close(); } catch (Exception e) {}
+		pipeOut = null;
 		message = new DefaultNailgunRequestImpl();
 	}
 
@@ -218,8 +224,27 @@ public class NailgunContextState {
 		buffer.readBytes(bytes);
 	}
 	
-	public void writeStdin(byte[] stdin) {
-		
+	/**
+	 * Writes a chunk of nailgun client supplied stdin to the command handler's input stream
+	 * @param stdin The bytes to write
+	 * @throws IOException thrown on a stream write exception
+	 */
+	public void writeStdin(byte[] stdin) throws IOException {
+		pipeOut.write(stdin);
+		pipeOut.flush();
+	}
+	
+	/**
+	 * Closes the nailgun client's std in stream
+	 */
+	public void closeStdIn() {
+		try {
+			//pipeOut.write(-1);
+			pipeOut.flush();
+			pipeOut.close();
+		} catch (Exception e) {
+			
+		}
 	}
 
 	/**

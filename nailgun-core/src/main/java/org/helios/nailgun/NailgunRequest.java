@@ -1,8 +1,9 @@
 package org.helios.nailgun;
 
-import java.io.OutputStream;
+import java.io.InputStream;
 import java.net.InetAddress;
 import java.util.Properties;
+import java.util.concurrent.TimeUnit;
 
 /**
  * <p>Title: NailgunRequest</p>
@@ -51,11 +52,13 @@ public interface NailgunRequest {
 	public abstract int getRemotePort();
 	
 	/**
-	 * Returns an output stream that provides the streamed data feed from a nailgun client.
-	 * If the nailgun client call did not send a stream, this output stream immediately returns a <code>-1</code>.
-	 * @return an OutputStream feeding the nailgun client streamed input
+	 * Returns an input stream that provides the streamed data feed from a nailgun client.
+	 * The timeout specified is the amount of time to wait for the nailgun client to respond with its STDIN.
+	 * @param timeout The availability timeout
+	 * @param unit The availability timeout unit	 
+	 * @return an InputStream feeding the nailgun client streamed input
 	 */
-	public abstract OutputStream getOutputStream();
+	public abstract InputStream getInputStream(long timeout, TimeUnit unit);
 	
 	/**
 	 * Returns a message back to the nail gun client's StdOut

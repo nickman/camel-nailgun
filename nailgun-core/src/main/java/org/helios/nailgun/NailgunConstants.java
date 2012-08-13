@@ -27,7 +27,9 @@ package org.helios.nailgun;
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Map;
 import java.util.Set;
 
 /**
@@ -48,6 +50,29 @@ public class NailgunConstants {
 	//		Payload Type Chunks
 	//=========================================================================================
 	
+	private static final Map<Byte, String> DECODES = new HashMap<Byte, String>();
+	
+	static {
+		try {
+			 for(Field f: NailgunConstants.class.getDeclaredFields()) {
+				 if(f.getType().equals(byte.class)) {
+					 DECODES.put(f.getByte(null), f.getName());
+				 }
+			 }
+		} catch (Exception e) {
+			throw new RuntimeException(e);
+		}
+	}
+	
+	
+	/**
+	 * Decodes a byte marker to its textual name
+	 * @param b The byte marker
+	 * @return The textual name or null if it could not be decoded.
+	 */
+	public static String decode(byte b) {
+		return DECODES.get(b);
+	}
 	/**
 	 * Chunk type marker for command line arguments
 	 */
